@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-gitops
+  namespace: argocd
+  labels:
+    app: nginx
+    managed-by: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io  # Cascade delete on app removal
+spec:
+  project: default
+ 
+  # ── Source: Your Git Repository ──────────────────────────────────
+  source:
+    repoURL: https://github.com/ahmadjutt29/k8s-gitops-nginx.git
+    targetRevision: main
+    path: apps/nginx
+ 
+  # ── Destination: Your K3s Cluster ────────────────────────────────
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nginx
+ 
+  # ── Sync Policy: Full GitOps Automation ──────────────────────────
+  syncPolicy:
+    automated:
+      prune: true         # Remove resources deleted from Git
+      selfHeal: true      # Auto-revert manual cluster changes
+      allowEmpty: false   # Prevent accidental empty syncs
+    syncOptions:
+    - CreateNamespace=true   # Auto-create 'nginx' namespace
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true         # Prune after other resources sync
+    - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+ 
+  # ── Health & Diff Ignore ─────────────────────────────────────────
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/replicas   # Ignore HPA-managed replica count
+  revisionHistoryLimit: 10
+
