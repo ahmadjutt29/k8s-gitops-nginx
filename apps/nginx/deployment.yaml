@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: nginx
+  labels:
+    app: nginx
+    version: '1.25'
+  annotations:
+    deployment.kubernetes.io/revision: '1'
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+ 
+  # ── Rolling Update Strategy (zero downtime) ──────────────────────
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # 1 extra pod during update
+      maxUnavailable: 0  # Never reduce below desired replicas
+ 
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: '1.25'
+    spec:
+      # ── Graceful Termination ──────────────────────────────────────
+      terminationGracePeriodSeconds: 30
+ 
+      # ── Security Context ─────────────────────────────────────────
+      securityContext:
+        runAsNonRoot: false
+        fsGroup: 101
+ 
+      containers:
+      - name: nginx
+        image: nginx:1.25        # <── change this to test versions
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+ 
+        # ── Resource Limits (production best practice) ───────────────
+        resources:
+          requests:
+            cpu: '50m'
+            memory: '64Mi'
+          limits:
+            cpu: '200m'
+            memory: '128Mi'
+ 
+        # ── Liveness Probe ────────────────────────────────────────────
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          failureThreshold: 3
+          successThreshold: 1
+          timeoutSeconds: 5
+ 
+        # ── Readiness Probe ───────────────────────────────────────────
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+          timeoutSeconds: 3
+ 
+        # ── Startup Probe ─────────────────────────────────────────────
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 12
+ 
+        # ── ConfigMap Volume Mount ────────────────────────────────────
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: nginx.conf
+          readOnly: true
+ 
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+ 
+      # ── Topology Spread (spread pods across nodes if multi-node) ────
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: nginx
+

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nginx
+  labels:
+    app.kubernetes.io/name: nginx
+    environment: production
+    managed-by: argocd
+
