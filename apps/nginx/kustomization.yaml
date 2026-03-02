@@ -10,5 +10,3 @@ configMapGenerator:
   namespace: nginx
   files:
   - html/index.html
-  options:
-    disableNameSuffixHash: true
